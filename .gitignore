@@ -1,0 +1,8 @@
+venv/
+.idea/
+__pycache__/
+*.pyc
+logs/
+chroma_db/
+messageMemory/message_history
+Data/

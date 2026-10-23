@@ -1,0 +1,7 @@
+chat_model_name: qwen-max
+embed_model_name: text-embedding-v3
+
+message_history_path: messageMemory\message_history
+
+#message_history_window: 30
+#rag_history_window: 12
