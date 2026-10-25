@@ -1,4 +1,7 @@
 import os
+
+from langgraph.prebuilt import ToolRuntime
+
 from utils.logger_handler import logger
 from langchain_core.tools import tool
 
@@ -7,6 +10,7 @@ import random
 from utils.config_handler import agent_conf
 from utils.path_tool import get_abs_path
 
+# 获取rag总结服务实例
 rag = RagSummarizeService()
 
 user_ids = ["1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009", "1010", ]
@@ -18,8 +22,12 @@ external_data = {}
 
 
 @tool(description="从向量存储中检索参考资料")
-def rag_summarize(query: str) -> str:
-    return rag.rag_summarize(query)
+def rag_summarize(query: str, runtime: ToolRuntime) -> str:
+    # session_id 由 Agent 通过 stream(context=...) 注入，不作为模型可见的工具参数
+    session_id = (runtime.context or {}).get("session_id", "")
+    logger.debug(f"[rag_summarize] runtime.context={runtime.context}，取到 session_id={session_id}")
+    # 调用rag总结服务，返回资料
+    return rag.rag_summarize(query, session_id)
 
 
 @tool(description="获取指定城市的天气，以消息字符串的形式返回")
@@ -110,7 +118,6 @@ def fetch_external_data(user_id: str, month: str) -> str:
 @tool(description="无入参，无返回值，调用后触发中间件自动为报告生成的场景动态注入上下文信息，为后续提示词切换提供上下文信息")
 def fill_context_for_report():
     return "fill_context_for_report已调用"
-
 
 # 测试
 # if __name__ == "__main__":

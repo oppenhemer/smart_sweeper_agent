@@ -19,7 +19,7 @@ from model.factory import embed_model
 
 class VectorStoreService:
     def __init__(self):
-        self.vector_store = vectorstore = Chroma(
+        self.vector_store = Chroma(
             collection_name=chroma_conf["collection_name"],  # 相当于设置数据库名
             embedding_function=embed_model,  # 使用的嵌入模型
             persist_directory=get_abs_path(chroma_conf["persist_directory"]),  # 数据库位置

@@ -10,8 +10,8 @@ RAG总结服务
 from typing import List
 
 from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from messageMemory.file_history_store import FileCharacterMessageHistory
 from rag.vector_store import VectorStoreService
 
 # 导入聊天提示词模板
@@ -22,9 +22,29 @@ from model.factory import chat_model
 from utils.prompt_loader import load_rag_prompt
 # 导入字符串解析器
 from langchain_core.output_parsers import StrOutputParser
-
-
+from messageMemory.file_history_store import FileCharacterMessageHistory, get_history
 # 导入配置文件
+from utils.config_handler import rag_conf
+
+
+# 读取会话历史：只保留用户提问与最终回答，拼成纯文本
+def _get_history_text(session_id: str) -> str:
+    # 无会话标识时直接返回占位文本
+    if not session_id:
+        return "无"
+    # 获取聊天历史对象
+    store: FileCharacterMessageHistory = get_history(session_id)
+    # 按消息条数截断，约等于最近 6 轮问答,截取最近消息,有几条给几条，最多12条
+    recent_messages: List[BaseMessage] = store.messages[-rag_conf["rag_history_window"]:]  # 返回List[BaseMessage]
+    lines = []
+    for message in recent_messages:
+        if isinstance(message, HumanMessage):
+            lines.append(f"用户：{message.content}")
+        # 带 tool_calls 的是过渡话术，不是用户看到过的回答，必须过滤
+        elif isinstance(message, AIMessage) :
+            lines.append(f"助手：{message.content}")
+            # \n当分隔符，将列表拼接成字符串
+    return "\n".join(lines) if lines else "无"
 
 
 def temp(prompt):
@@ -43,7 +63,7 @@ class RagSummarizeService:
         self.prompt_template = PromptTemplate.from_template(self.prompt_text)
         self.chain = self._init_chain()
 
-    def rag_summarize(self, query: str):
+    def rag_summarize(self, query: str, session_id: str):
         # 获取检索资料
         context_docs = self.retrieve_docs(query)
         # 组装成文本
@@ -52,11 +72,14 @@ class RagSummarizeService:
         for doc in context_docs:
             counter += 1
             context += f"【参考资料{counter}】: 参考资料：{doc.page_content} | 参考元数据：{doc.metadata}\n"
-        return self.chain.invoke({"input": query, "context": context})
+            # 读取最近窗口的历史对话，仅用于理解指代与语境
+        history_text = _get_history_text(session_id)
+        return self.chain.invoke({"input": query, "context": context, "history": history_text})
 
     # 返回使用链
     def _init_chain(self):
-        chain = self.prompt_template | self.model | StrOutputParser()
+        # temp 是调试透传函数，传函数对象本身，不要写成 temp()
+        chain = self.prompt_template | temp | self.model | StrOutputParser()
         return chain
 
     # 检索文本
@@ -67,4 +90,4 @@ class RagSummarizeService:
 # 测试
 if __name__ == "__main__":
     rag_service = RagSummarizeService()
-    print(rag_service.rag_summarize("小户型适合哪些扫地机器人"))
+    print(rag_service.rag_summarize("那耗材多久换一次", "session_c2354ef4e731432583ee0300c0d708e7"))

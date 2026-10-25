@@ -43,14 +43,19 @@ class ReactAgent:
             ]
         }
         lasted_content = ""
-        # 第三个参数context就是上下文runtime中的信息，就是我们做提示词切换的标记
-        for chunk in self.agent.stream(input_dict, stream_mode="values", context={"report": False}):
+        # 第三个参数context就是上下文runtime中的信息，就是我们做提示词切换的标记,若report为True,则需要生成报告，初始为False
+        for chunk in self.agent.stream(input_dict, stream_mode="values",
+                                       context={"report": False, "session_id": session_id}):
             latest_message = chunk["messages"][-1]
 
             if isinstance(latest_message, AIMessage):
-                content = latest_message.content.strip() if isinstance(latest_message.content, str) else str(latest_message.content)
+                content = latest_message.content.strip() if isinstance(latest_message.content, str) else str(
+                    latest_message.content)
+                # content 为空通常意味着本轮模型只返回了 tool_calls（纯工具调用），
+                # 没有可展示的文本过渡话术；跳过以免推送空消息、也避免空串覆盖 lasted_content
                 if not content:
                     continue
+                # 若带 tool_calls，则是"准备调工具"的过渡话术，归入思考过程
                 if latest_message.tool_calls:
                     # 带 tool_calls 的是"准备调工具"的过渡话术，归入思考过程
                     yield {"type": "thinking", "content": content}
@@ -59,7 +64,8 @@ class ReactAgent:
                     lasted_content = content
                     yield {"type": "final", "content": content}
             elif isinstance(latest_message, ToolMessage):
-                content = latest_message.content if isinstance(latest_message.content, str) else str(latest_message.content)
+                content = latest_message.content if isinstance(latest_message.content, str) else str(
+                    latest_message.content)
                 yield {"type": "tool", "content": content}
         # 用户输入和模型最终回答持久化
         if lasted_content:

@@ -39,6 +39,7 @@ def monitor_tool(request: ToolCallRequest, handler: Callable[[ToolCallRequest], 
     start = time.time()
     try:
         if tool_name == "fill_context_for_report":
+            # 若需要调用报告提示词，则设置标志位
             request.runtime.context['report_prompt_switch'] = True
         result = handler(request)
     except Exception as e:
